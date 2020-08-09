@@ -1,0 +1,217 @@
+package com.example.skolapp_client_gab;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.android.volley.DefaultRetryPolicy;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.example.skolapp_client_gab.R;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import java.net.URL;
+import java.net.URLConnection;
+import java.text.DateFormat;
+import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+
+public class MainActivity extends AppCompatActivity {
+    final String url ="http://94.237.45.148:1176/";
+    TextView skolaView;
+    TextView thisMonthSpending;
+    TextView currentMonth;
+    RequestQueue queue;
+    ArrayList<Double> igSumaArr;
+    ArrayList<Double> gabSumaArr;
+    DecimalFormat format = new DecimalFormat("0.00");
+
+    //TODO: padaryt kad butu galima istrint paymenta, jei ne taip ivedi
+    //TODO: padaryt kad tikrintu ar yra connectionas
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        Button toPayment = findViewById(R.id.toPayment);
+        Button toSummary = findViewById(R.id.toSummary);
+        final SwipeRefreshLayout refreshLayout = findViewById(R.id.refreshLayout);
+        skolaView = findViewById(R.id.textView);
+        thisMonthSpending = findViewById(R.id.thisMonthSpending);
+        currentMonth = findViewById(R.id.monthTitle);
+        queue = Volley.newRequestQueue(this);
+        updateValue(new VolleyCallBackFloatValue() {
+            @Override
+            public void onSuccess() {
+                if (Float.parseFloat(skolaView.getText().toString()) < 0){
+                    skolaView.setOnLongClickListener(new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View view) {
+                            OnSkolRemoveDialogue dialogue = new OnSkolRemoveDialogue();
+                            dialogue.show(getSupportFragmentManager(), "RemoveSkol");
+                            return true;
+                        }
+                    });
+                }
+            }
+        });
+        refreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                updateValue(new VolleyCallBackFloatValue() {
+                    @Override
+                    public void onSuccess() {}
+                });
+                refreshLayout.setRefreshing(false);
+            }
+        });
+        toPayment.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(getApplicationContext(), PaymentActivity.class);
+                startActivity(intent);
+            }
+        });
+        toSummary.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(getApplicationContext(), SummaryActivity.class);
+                startActivity(intent);
+            }
+        });
+    }
+    public void updateValue(final VolleyCallBackFloatValue volleyCallBack){
+        getSkolIg(new VolleyCallBack() {
+            @Override
+            public void onSuccess(float value) {
+                final float igSum = value;
+                getSkolGab(new VolleyCallBack() {
+                    @Override
+                    public void onSuccess(float value) {
+                        double kof = value - igSum;
+                        kof = Math.round(kof * 100.0) / 100.0;
+                        skolaView.setText(format.format(kof));
+                        volleyCallBack.onSuccess();
+                    }
+                });
+            }
+        });
+        getTotalSpendings(new VolleyCallBack() {
+            @Override
+            public void onSuccess(float value) {
+                DateFormat dateFormat = new SimpleDateFormat("MMMM");
+                currentMonth.setText("Spendings in " + dateFormat.format(Calendar.getInstance().getTime()) + ":");
+                thisMonthSpending.setText(Float.toString(value));
+            }
+        });
+    }
+    public void getSkolIg(final VolleyCallBack volleyCallBack){
+        igSumaArr = new ArrayList<>();
+        StringRequest stringRequestIg = new StringRequest(Request.Method.GET, url + "Ignas",
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try{
+                            JSONArray jsonArray = new JSONArray(response);
+                            for (int i = 0; i < jsonArray.length(); i++){
+                                igSumaArr.add(jsonArray.getJSONObject(i).getDouble("ammount"));
+                            }
+                            float igSum = 0;
+                            for (Double i : igSumaArr){
+                                igSum += i;
+                            }
+                            igSum = igSum / 2;
+                            volleyCallBack.onSuccess(igSum);
+                            Log.i("JSONRESPONSE", jsonArray.toString());
+                        }
+                        catch (Exception e){
+                            e.printStackTrace();
+                        }
+
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.i("Error", error.toString());
+            }
+        });
+        queue.add(stringRequestIg);
+    }
+    public void getSkolGab(final VolleyCallBack volleyCallBack){
+        gabSumaArr = new ArrayList<>();
+        StringRequest stringRequestGab = new StringRequest(Request.Method.GET, url + "Gabija",
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try{
+                            JSONArray jsonArray = new JSONArray(response);
+                            for (int i = 0; i < jsonArray.length(); i++){
+                                gabSumaArr.add(jsonArray.getJSONObject(i).getDouble("ammount"));
+                            }
+                            Log.i("JSONRESPONSE", jsonArray.toString());
+                            float gabSum = 0;
+                            for (Double i : gabSumaArr){
+                                gabSum += i;
+                            }
+                            gabSum = gabSum / 2;
+                            volleyCallBack.onSuccess(gabSum);
+                        }
+                        catch (Exception e){
+                            e.printStackTrace();
+                        }
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.i("Error", error.toString());
+            }
+        });
+        queue.add(stringRequestGab);
+    }
+    public void getTotalSpendings(final VolleyCallBack volleyCallBack){
+        final DateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        final DateFormat dateFormatNoDay = new SimpleDateFormat("yyyy-MM");
+        StringRequest stringRequestTotal = new StringRequest(Request.Method.GET, url + "monthly_spendings/" + dateFormatNoDay.format(Calendar.getInstance().getTime()) + "-01&" + simpleDateFormat.format(Calendar.getInstance().getTime()),
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        ArrayList<Double> sumArray = new ArrayList<>();
+                        float sum = 0;
+                        try {
+                            JSONArray jsonArray = new JSONArray(response);
+                            for (int i = 0; i < jsonArray.length(); i++){
+                                sumArray.add(jsonArray.getJSONObject(i).getDouble("ammount"));
+                            }
+                            for (Double i : sumArray){
+                                sum += i;
+                            }
+                            volleyCallBack.onSuccess(sum);
+                        }
+                        catch (JSONException e){
+                            e.printStackTrace();
+                        }
+                        Log.i("Monthly", response);
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.i("Error", error.toString());
+            }
+        });
+        queue.add(stringRequestTotal);
+    }
+}
