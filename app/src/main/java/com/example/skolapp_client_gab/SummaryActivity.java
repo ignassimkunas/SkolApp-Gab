@@ -26,9 +26,11 @@ import org.json.JSONException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 
+import static com.example.skolapp_client_gab.MainActivity.getCurrentSsid;
+
 public class SummaryActivity extends AppCompatActivity {
     RequestQueue queue;
-    final String url = "http://94.237.45.148:1176/";
+    String url;
     TableLayout tableLayout;
     final int textSize = 13;
     final int textSizeHeader = 24;
@@ -38,6 +40,12 @@ public class SummaryActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         queue = Volley.newRequestQueue(this);
+        if (getCurrentSsid(this).equals("\"GabAndIg5Ghz\"") || getCurrentSsid(this).equals("\"GabAndIg24Ghz\"") || getCurrentSsid(this).equals("\"GabAndIg\"")){
+            url = "http://192.168.0.45:1176/";
+        }
+        else{
+            url = "http://5.20.217.145:1176/";
+        }
         setContentView(R.layout.activity_summary);
         tableLayout = findViewById(R.id.tableLayout);
         format = new SimpleDateFormat("YYYY-MM-DD");

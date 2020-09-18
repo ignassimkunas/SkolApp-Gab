@@ -65,7 +65,6 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="@font/solway_regular"
-            android:text="452.4"
             android:textAlignment="center"
             android:textColor="@android:color/white"
             android:textSize="40sp" />
